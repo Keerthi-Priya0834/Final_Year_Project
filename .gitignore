@@ -1,0 +1,26 @@
+# Database
+data/*.db
+
+# MinIO data
+storage/*
+!storage/.gitkeep
+
+# Model weights
+inference/weights/*.pth
+inference/weights/*.pt
+inference/weights/*.bin
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# Env
+.env
+
+# OS
+.DS_Store
+
+# Node
+node_modules/

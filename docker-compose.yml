@@ -1,0 +1,72 @@
+services:
+  api:
+    build: ./backend
+    container_name: eyeq-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    env_file: .env
+    environment:
+      - INFERENCE_URL=http://inference:8001
+      - DATABASE_URL=sqlite+aiosqlite:///./data/eyeq.db
+      - MINIO_ENDPOINT=minio:9000
+    depends_on:
+      - inference
+      - minio
+    restart: unless-stopped
+
+  inference:
+    build: ./inference
+    container_name: eyeq-inference
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./inference/weights:/app/weights
+    env_file: .env
+    environment:
+      - MODEL_PATH=/app/weights/vit_amd.pth
+      - USE_MOCK_MODEL=true
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    container_name: eyeq-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - ./storage:/data
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  minio-setup:
+    image: minio/mc:latest
+    container_name: eyeq-minio-setup
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 minioadmin minioadmin; do sleep 1; done;
+      mc mb --ignore-existing local/eyeq-scans;
+      mc anonymous set download local/eyeq-scans;
+      exit 0;
+      "
+    restart: "no"
+
+  frontend:
+    build: ./frontend
+    container_name: eyeq-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+    restart: unless-stopped
